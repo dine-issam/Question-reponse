@@ -1,0 +1,174 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load humanize %}
+{% block title %}{{quest.title}}{% endblock %}
+{% block content %}
+<!-- Question List -->
+    <div class="container">
+        <h2 class="my-4">{{quest.title}}</h2>
+        <p>{{quest.detail}}</p>
+        <p>
+            tags:
+            {% for tag in tags %}
+            <a href="/tag/{{tag|slugify}}" class="badge badge-secondary p-1">{{tag}}</a>
+            {% endfor %}
+        </p>
+        <p>
+            <span class="mr-4">{{quest.add_time|date:'d/m/Y'}}</span>
+            <a href="#">{{quest.user.username}}</a>
+        </p>
+        <hr/>
+        {% for answer in answers %}
+        <div class="row">
+            <div class="col-1" style="text-align: center;">
+                <div class="upvote">
+                    <strong class="upvote-count-{{answer.id}}">{{answer.upvote_set.count}}</strong><br/>
+                    <span class="text-success">
+                        <i class="fa fa-arrow-up fa-2x upvote-click" data-answer="{{answer.id}}"></i>
+                    </span>
+                </div>
+                <div class="downvote mt-3">
+                    <span class="text-danger">
+                        <i class="fa fa-arrow-down fa-2x downvote-click" data-answer="{{answer.id}}"></i>
+                    </span><br/>
+                    <strong class="downvote-count-{{answer.id}}">{{answer.downvote_set.count}}</strong>
+                </div>
+            </div>
+            <div class="col-11">
+                <p>
+                    {{ answer.detail }}
+                </p>
+                <p>
+                    <a href="#" class="mr-3">{{answer.user.username}}</a>
+                    <span class="mr-3"><span class="comment-count-{{answer.id}}">{{answer.comment_set.count}}</span> comments</span>
+                    <span>{{answer.add_time|date:'d/m/Y h:i:s'}}</span>
+                </p>
+                <!-- Comment Section Start -->
+                <h3 class="my-4">Comment</h3>
+                <div class="comment-wrapper-{{answer.id}}">
+                    {% for comment in answer.comment_set.all %}
+                    <div class="card mb-2">
+                        <div class="card-body">
+                            <p>{{comment.comment}}</p>
+                            <p>
+                                <a href="#">{{comment.user.username}}</a>
+                            </p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% if user.is_authenticated %}
+                <!-- Comment Form -->
+                <div class="card my-3">
+                    <h6 class="card-header">Add Comment</h6>
+                    <div class="card-body">
+                        <textarea class="form-control comment-text-{{answer.id}}"></textarea>
+                        <button type="button" data-answer="{{answer.id}}" class="btn btn-dark my-3 save-comment">Submit</button>
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        <hr/>
+        {% endfor %}
+
+        {% if user.is_authenticated %}
+        {% for msg in messages %}
+            <p class="text-success">{{msg}}</p>
+        {% endfor %}
+        <form method="post">
+            {% csrf_token %}
+            <table class="table table-bordered">
+                {{answerform.as_table}}
+                <tr>
+                    <td colspan="2">
+                        <input type="submit" class="btn btn-dark" />
+                    </td>
+                </tr>
+            </table>
+        </form>
+        {% endif %}
+    </div>
+<script>
+    $(document).ready(function(){
+        $(".save-comment").on('click',function(){
+            var _answerid=$(this).data('answer');
+            var _comment=$(".comment-text-"+_answerid).val();
+            // Ajax
+            $.ajax({
+                url:"/save-comment",
+                type:"post",
+                data:{
+                    comment:_comment,
+                    answerid:_answerid,
+                    csrfmiddlewaretoken:"{{csrf_token}}"
+                },
+                dataType:'json',
+                beforeSend:function(){
+                    $(".save-comment").addClass('disabled').text('saving...');
+                },
+                success:function(res){
+                    if(res.bool==true){
+                        $(".comment-text-"+_answerid).val('');
+                        // Append Element
+                        var _html='<div class="card mb-2 animate__animated animate__bounce">\
+                        <div class="card-body">\
+                            <p>'+_comment+'</p>\
+                            <p>\
+                                <a href="#">{{request.user}}</a>\
+                            </p>\
+                        </div>\
+                    </div>';
+                    $(".comment-wrapper-"+_answerid).append(_html);
+                    var prevCount=$(".comment-count-"+_answerid).text();
+                    $(".comment-count-"+_answerid).text(parseInt(prevCount)+1);
+                    }
+                    $(".save-comment").removeClass('disabled').text('Submit');
+                }
+            });
+        });
+
+        // Upvote
+        $(".upvote-click").on('click',function(){
+            var answerid=$(this).data('answer');
+            // Ajax
+            $.ajax({
+                url:"/save-upvote",
+                type:"post",
+                data:{
+                    answerid:answerid,
+                    csrfmiddlewaretoken:"{{csrf_token}}"
+                },
+                dataType:'json',
+                success:function(res){
+                    var _prevupvote=$(".upvote-count-"+answerid).text();
+                    if(res.bool==true){
+                        $(".upvote-count-"+answerid).text(parseInt(_prevupvote)+1);
+                    }
+                }
+            });
+        });
+
+        // Downvote
+        $(".downvote-click").on('click',function(){
+            var answerid=$(this).data('answer');
+            // Ajax
+            $.ajax({
+                url:"/save-downvote",
+                type:"post",
+                data:{
+                    answerid:answerid,
+                    csrfmiddlewaretoken:"{{csrf_token}}"
+                },
+                dataType:'json',
+                success:function(res){
+                    var _prevupvote=$(".downvote-count-"+answerid).text();
+                    if(res.bool==true){
+                        $(".downvote-count-"+answerid).text(parseInt(_prevupvote)+1);
+                    }
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
